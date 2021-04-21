@@ -1,2 +1,2 @@
 # drone-control
-Drone controller for the AAU built drone
+Drone controller, simulator, and documentation for the AAU built drone
