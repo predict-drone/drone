@@ -5,4 +5,8 @@ int uart2_write(unsigned char data);
 
 int uart2_read(unsigned char *data);
 
+int uart3_write(unsigned char data);
+
+int uart3_read(unsigned char *data);
+
 #endif // __UART_H

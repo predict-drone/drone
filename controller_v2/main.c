@@ -5,7 +5,14 @@
 
 /** Static variables -------------------------------------------------------- */
 pthread_mutex_t print_mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t pid_mtx = PTHREAD_MUTEX_INITIALIZER;
 
+pid_instance_t pitch_pid;
+pid_instance_t roll_pid;
+pid_instance_t yaw_pid;
+pid_instance_t pitch_vel_pid;
+pid_instance_t roll_vel_pid;
+pid_instance_t yaw_vel_pid;
 
 
 static void* mock_thread(void* args)

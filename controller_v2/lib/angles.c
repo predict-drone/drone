@@ -6,6 +6,7 @@
 #include "angles.h"
 #include "main.h"
 #include "lib/timer.h"
+#include "util.h"
 
 #define SETUP_MEASUREMENTS 500
 
@@ -19,12 +20,22 @@ typedef struct angles_axis_t {
 
 /** Static variables -------------------------------------------------------- */
 static bool init;
+static double pitch_avg = 0;
+static double roll_avg = 0;
+static double yaw_avg = 0;
+static double gyro_x_avg = 0;
+static double gyro_y_avg = 0;
+static double gyro_z_avg = 0;
+static double alpha = 0.8;
+
 static pthread_mutex_t init_mtx = PTHREAD_MUTEX_INITIALIZER;
 static angles_axis_t gyro_err;
 static angles_axis_t accel_err;
 //static angles_axis_t gyro;
 //static angles_axis_t accel;
+
 static angles_t position;
+static angles_t angle_vel;
 static uint64_t last_time;
 static pthread_mutex_t position_mtx = PTHREAD_MUTEX_INITIALIZER;
 
@@ -51,6 +62,20 @@ static angles_axis_t calculate_angles_gyro(void)
 	return gyro;
 }
 
+static angles_axis_t calculate_angle_vel_gyro(void)
+{
+	mpu6050_gyro_t gyro_data = mpu6050_gyro_read();
+	double x_dps = gyro_data.x / 32.8 - gyro_err.x;
+	double y_dps = gyro_data.y / 32.8 - gyro_err.y;
+	double z_dps = gyro_data.z / 32.8 - gyro_err.z;
+
+	angles_axis_t gyro;
+	gyro.x = x_dps;
+	gyro.y = y_dps;
+	gyro.z = z_dps;
+	return gyro;
+}
+
 static angles_axis_t calculate_angles_accel(void)
 {
 	mpu6050_accel_t accel_data = mpu6050_accel_read();
@@ -58,7 +83,7 @@ static angles_axis_t calculate_angles_accel(void)
 	double y = accel_data.y;
 	double z = accel_data.z;
 	angles_axis_t accel;
-	accel.x = -(atan(x / (sqrt(pow(y, 2) + pow(z, 2)))) - accel_err.x)*180/M_PI;
+	accel.x = -(atan(x / (sqrt(pow(y, 2) + pow(z, 2)))) - accel_err.x)*180/M_PI;		//Converts the accelerometer data to angle position [degrees].
 	accel.y = (atan(y / (sqrt(pow(x, 2) + pow(z, 2)))) - accel_err.y)*180/M_PI;
 	accel.z = (atan(z / (sqrt(pow(y, 2) + pow(x, 2)))) - accel_err.z)*180/M_PI;
 	return accel;
@@ -108,8 +133,7 @@ void angles_init(void)
 
 	pthread_mutex_lock(&print_mtx);
 	printf("Gyro err: %.2f, %.2f, %.2f\n", gyro_err.y, gyro_err.x, gyro_err.z);
-	printf("Accel err: %.2f, %.2f, %.2f\n", accel_err.z, accel_err.y,
-			accel_err.z);
+	printf("Accel err: %.2f, %.2f, %.2f\n", accel_err.z, accel_err.y, accel_err.z);
 	pthread_mutex_unlock(&print_mtx);
 	last_time = micros();
 
@@ -120,12 +144,35 @@ void angles_init(void)
 
 void calculate_angles(void) {
 	angles_axis_t gyro = calculate_angles_gyro();
+	angles_axis_t gyro_vel = calculate_angle_vel_gyro();
 	angles_axis_t accel = calculate_angles_accel();
 
+	double pitch_acc = 0;
+	double roll_acc = 0;
+	double yaw_acc = 0;
+
 	pthread_mutex_lock(&position_mtx);
-	position.pitch = 0.95*(position.pitch + gyro.y) + 0.05*accel.x;
-	position.roll = 0.95*(position.roll + gyro.x) + 0.05*accel.y;
-	position.yaw += gyro.z;
+
+	pitch_acc = 0.95 * (position.pitch + gyro.y) + 0.05 * accel.x;		//Complementary filtering: Mixing acc and gyro data to minimise both noise and drift. [degrees]
+	roll_acc = 0.95 * (position.roll + gyro.x) + 0.05 * accel.y;
+	yaw_acc = 0.95 * (position.yaw + gyro.z) + 0.05 * accel.z;
+
+	pitch_avg += alpha * (pitch_acc - pitch_avg);
+	roll_avg += alpha * (roll_acc - roll_avg);
+	yaw_avg += alpha * (yaw_acc - yaw_avg);
+
+	gyro_x_avg += alpha * (gyro_vel.x - gyro_x_avg);
+	gyro_y_avg += alpha * (gyro_vel.y - gyro_y_avg);
+	gyro_z_avg += alpha * (gyro_vel.z - gyro_z_avg);
+
+	position.pitch = pitch_avg;
+	position.roll = roll_avg;
+	position.yaw = yaw_avg;
+	
+	angle_vel.pitch = gyro_y_avg;
+	angle_vel.roll = gyro_x_avg;
+	angle_vel.yaw = gyro_z_avg;
+
 	if (position.yaw > 90) position.yaw = 90;		//We should set limits to it
 	if (position.yaw < -90) position.yaw = -90;
 	pthread_mutex_unlock(&position_mtx);
@@ -135,6 +182,14 @@ angles_t get_angles(void)
 {
 	pthread_mutex_lock(&position_mtx);
 	angles_t aux = position;
+	pthread_mutex_unlock(&position_mtx);
+	return aux;
+}
+
+angles_t get_angle_vel(void)
+{
+	pthread_mutex_lock(&position_mtx);
+	angles_t aux = angle_vel;
 	pthread_mutex_unlock(&position_mtx);
 	return aux;
 }

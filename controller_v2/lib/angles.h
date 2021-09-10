@@ -18,6 +18,7 @@ void angles_init(void);
 void calculate_angles(void);
 
 angles_t get_angles(void);
+angles_t get_angle_vel(void);
 
 bool angles_is_init(void);
 
