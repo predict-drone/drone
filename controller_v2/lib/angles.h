@@ -4,12 +4,16 @@
 #include <stdbool.h>
 
 #include "sensors/mpu6050.h"
+#include "lib/fixedptc.h"
 
 
 typedef struct angles_t {
-	double pitch;
-	double roll;
-	double yaw;
+	fixedpt pitch;
+	fixedpt roll;
+	fixedpt yaw;
+	fixedpt pitch_speed;
+	fixedpt roll_speed;
+	fixedpt yaw_speed;
 } angles_t;
 
 
@@ -18,7 +22,6 @@ void angles_init(void);
 void calculate_angles(void);
 
 angles_t get_angles(void);
-angles_t get_angle_vel(void);
 
 bool angles_is_init(void);
 

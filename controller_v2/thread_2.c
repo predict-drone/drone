@@ -50,16 +50,17 @@ void* thread_2_main(void* args)
 	while (true) {
 		if (next_time < micros()) {
 			double motor_0 = 0, motor_1 = 0, motor_2 = 0, motor_3 = 0;
-			angles_t angles_vel = get_angle_vel();
 			angles_t angles = get_angles();
 
 			pthread_mutex_lock(&pid_mtx);
 			pid_angle.pitch = pid_fire(pitch_pid, 0, angles.pitch);
 			pid_angle.roll = pid_fire(roll_pid, 0, angles.roll);
 			//pid_angle.yaw = pid_fire(yaw_pid, 0, angles.yaw);
-			pid_vel.pitch = pid_fire(pitch_vel_pid, pid_angle.pitch, angles_vel.pitch);
-			pid_vel.roll = pid_fire(roll_vel_pid, pid_angle.roll, angles_vel.roll);
-			pid_vel.yaw = pid_fire(yaw_vel_pid, 0, angles_vel.yaw);
+			pid_vel.pitch = pid_fire(pitch_vel_pid, pid_angle.pitch,
+					angles.pitch_speed);
+			pid_vel.roll = pid_fire(roll_vel_pid, pid_angle.roll,
+					angles.roll_speed);
+			pid_vel.yaw = pid_fire(yaw_vel_pid, 0, angles.yaw_speed);
 			pthread_mutex_unlock(&pid_mtx);
 
 			transmitter_read();
