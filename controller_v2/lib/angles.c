@@ -7,36 +7,31 @@
 #include "main.h"
 #include "lib/timer.h"
 #include "util.h"
+#include "atan_table.h"
 
-#define SETUP_MEASUREMENTS 500
+#define SETUP_MEASUREMENTS 512U
+#define SETUP_MEASUREMENTS_FIX (fixedpt_rconst(5000))
 #define ALPHA (fixedpt_rconst(0.8))
 
 
 /** Data structures --------------------------------------------------------- */
 typedef struct angles_accel_axis_t {
-	double x; /** Accel x position */
-	double y; /** Accel x position */
-	double z; /** Accel x position */
+	fixedpt x; /** Accel x position (deg) */
+	fixedpt y; /** Accel y position (deg) */
 } angles_accel_axis_t;
 
 typedef struct angles_gyro_axis_t {
-	fixedpt x;   /** Gyro x axis position */
-	fixedpt y;   /** Gyro y axis position */
-	fixedpt z;   /** Gyro z axis position */
-	fixedpt x_s; /** Gyro x axis speed */
-	fixedpt y_s; /** Gyro y axis speed */
-	fixedpt z_s; /** Gyro z axis speed */
+	fixedpt x;   /** Gyro x axis position (deg) */
+	fixedpt y;   /** Gyro y axis position (deg) */
+	fixedpt z;   /** Gyro z axis position (deg) */
+	fixedpt x_s; /** Gyro x axis speed (deg/s) */
+	fixedpt y_s; /** Gyro y axis speed (deg/s) */
+	fixedpt z_s; /** Gyro z axis speed (deg/s) */
 } angles_gyro_axis_t;
 
 /** Static variables -------------------------------------------------------- */
 static bool init; /** Whether the module has been initialized */
 static pthread_mutex_t init_mtx = PTHREAD_MUTEX_INITIALIZER;
-//static double pitch_avg = 0;
-//static double roll_avg = 0;
-//static double yaw_avg = 0;
-//static double gyro_x_avg = 0;
-//static double gyro_y_avg = 0;
-//static double gyro_z_avg = 0;
 
 static angles_gyro_axis_t gyro_err;  /** Gyroscope initial error */
 static angles_accel_axis_t accel_err; /** Accelerometer initial error */
@@ -48,7 +43,7 @@ static uint64_t gyro_last_time_us; /** Gyro last measurement time */
 /** Function prototypes ----------------------------------------------------- */
 static angles_gyro_axis_t calculate_angles_gyro(void);
 static angles_accel_axis_t calculate_angles_accel(void);
-static inline fixedpt combine(fixedpt pos, fixedpt gyro, double accel);
+static inline fixedpt combine(fixedpt pos, fixedpt gyro, fixedpt accel);
 
 /** Function definitions ---------------------------------------------------- */
 static angles_gyro_axis_t calculate_angles_gyro(void)
@@ -77,21 +72,27 @@ static angles_gyro_axis_t calculate_angles_gyro(void)
 static angles_accel_axis_t calculate_angles_accel(void)
 {
 	mpu6050_accel_t accel_data = mpu6050_accel_read();
-	double x = accel_data.x;
-	double y = accel_data.y;
-	double z = accel_data.z;
+
+	fixedpt x = (fixedpt_fromint(accel_data.x) >> 8);
+	fixedpt y = (fixedpt_fromint(accel_data.y) >> 8);
+	fixedpt z = (fixedpt_fromint(accel_data.z) >> 8);
+	fixedpt x2 = fixedpt_mul(x, x);
+	fixedpt y2 = fixedpt_mul(y, y);
+	fixedpt z2 = fixedpt_mul(z, z);
+	fixedpt xs = fixedpt_sqrt(y2 + z2);
+	fixedpt ys = fixedpt_sqrt(x2 + z2);
+	fixedpt aux_x = fixedpt_div(x, xs);
+	fixedpt aux_y = fixedpt_div(y, ys);
 	angles_accel_axis_t accel;
-	//Converts the accelerometer data to angle position [degrees].
-	accel.x = -(atan(x / (sqrt(pow(y, 2) + pow(z, 2)))) - accel_err.x)*180/M_PI;
-	accel.y = (atan(y / (sqrt(pow(x, 2) + pow(z, 2)))) - accel_err.y)*180/M_PI;
-	accel.z = (atan(z / (sqrt(pow(y, 2) + pow(x, 2)))) - accel_err.z)*180/M_PI;
+	accel.x = - atan_table(aux_x) - accel_err.x;
+	accel.y = atan_table(aux_y) - accel_err.y;
 	return accel;
 }
 
-static inline fixedpt combine(fixedpt pos, fixedpt gyro, double accel)
+static inline fixedpt combine(fixedpt pos, fixedpt gyro, fixedpt accel)
 {
 	return fixedpt_mul(fixedpt_rconst(0.95), (pos + gyro))
-		+ fixedpt_mul(fixedpt_rconst(0.05), fixedpt_rconst(accel));
+		+ fixedpt_mul(fixedpt_rconst(0.05), accel);
 }
 
 /** Public functions -------------------------------------------------------- */
@@ -126,23 +127,30 @@ void angles_init(void)
 	}
 
 	gyro_err.x_s = (fixedpt) fixedpt_xdiv(fixedpt_xdiv(fixedpt_fromint(gyro_x),
-				fixedpt_rconst(32.8)), fixedpt_rconst(SETUP_MEASUREMENTS));
+				fixedpt_rconst(32.8)), SETUP_MEASUREMENTS_FIX);
 	gyro_err.y_s = fixedpt_div(fixedpt_div(fixedpt_fromint(gyro_y),
-				fixedpt_rconst(32.8)), fixedpt_rconst(SETUP_MEASUREMENTS));
+				fixedpt_rconst(32.8)), SETUP_MEASUREMENTS_FIX);
 	gyro_err.z_s = fixedpt_div(fixedpt_div(fixedpt_fromint(gyro_z),
-				fixedpt_rconst(32.8)), fixedpt_rconst(SETUP_MEASUREMENTS));
+				fixedpt_rconst(32.8)), SETUP_MEASUREMENTS_FIX);
 
-	double x = accel_x / (double) SETUP_MEASUREMENTS;
-	double y = accel_y / (double) SETUP_MEASUREMENTS;
-	double z = accel_z / (double) SETUP_MEASUREMENTS;
-	accel_err.x = atan(x / (sqrt(pow(y, 2) + pow(z, 2))));
-	accel_err.y = atan(y / (sqrt(pow(x, 2) + pow(z, 2))));
-	accel_err.z = atan(z / (sqrt(pow(y, 2) + pow(x, 2))));
+	fixedpt x = (fixedpt_fromint(accel_x) >> 16);
+	fixedpt y = (fixedpt_fromint(accel_y) >> 16);
+	fixedpt z = (fixedpt_fromint(accel_z) >> 16);
+	fixedpt x2 = fixedpt_mul(x, x);
+	fixedpt y2 = fixedpt_mul(y, y);
+	fixedpt z2 = fixedpt_mul(z, z);
+	fixedpt xs = fixedpt_sqrt(y2 + z2);
+	fixedpt ys = fixedpt_sqrt(x2 + z2);
+	fixedpt aux_x = fixedpt_div(x, xs);
+	fixedpt aux_y = fixedpt_div(y, ys);
+	accel_err.x = - atan_table(aux_x);
+	accel_err.y = atan_table(aux_y);
 
 	pthread_mutex_lock(&print_mtx);
 	printf("Gyro err: %.2f, %.2f, %.2f\n", fixedpt_tofloat(gyro_err.y_s),
 			fixedpt_tofloat(gyro_err.x_s), fixedpt_tofloat(gyro_err.z_s));
-	printf("Accel err: %.2f, %.2f, %.2f\n", accel_err.z, accel_err.y, accel_err.z);
+	printf("Accel err: %.6f, %.6f\n", fixedpt_tofloat(accel_err.x),
+			fixedpt_tofloat(accel_err.y));
 	pthread_mutex_unlock(&print_mtx);
 
 	pthread_mutex_lock(&init_mtx);
@@ -153,18 +161,11 @@ void angles_init(void)
 }
 
 void calculate_angles(void) {
-	//uint64_t ti = micros();
 	angles_gyro_axis_t gyro = calculate_angles_gyro();
-	//uint64_t tg = micros();
 	angles_accel_axis_t accel = calculate_angles_accel();
-	//uint64_t ta = micros();
 
-	//Complementary filtering: Mixing acc and gyro data to minimise both noise
-	// and drift. [degrees]
-	//
 	fixedpt pitch = combine(angles.pitch, gyro.y, accel.x);
 	fixedpt roll = combine(angles.roll, gyro.x, accel.y);
-	uint64_t tc = micros();
 
 	pthread_mutex_lock(&angles_mtx);
 	angles.pitch = pitch;
@@ -174,14 +175,10 @@ void calculate_angles(void) {
 	angles.roll_speed += gyro.x_s;
 	angles.yaw_speed += gyro.z_s;
 
-	// Yaw limit
 	if (angles.yaw > fixedpt_fromint(180)) angles.yaw -= fixedpt_fromint(360);
 	if (angles.yaw < fixedpt_fromint(-180)) angles.yaw += fixedpt_fromint(360);
 
 	pthread_mutex_unlock(&angles_mtx);
-
-	//uint64_t te = micros();
-	//printf("T: %lld %lld %lld %lld\n", tg-ti, ta-tg, tc-ta, te-tc);
 }
 
 angles_t get_angles(void)
