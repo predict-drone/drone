@@ -65,7 +65,7 @@ class App(Cmd):
             self.get_pid(pid_id)
         for pid_id in opt.PID_ID:
             msg = self.recv_msg()
-            op, pid_id, kd, ki, kd = struc.unpack(">BBIII", msg)
+            op, pid_id, kd, ki, kd = struct.unpack(">BBIII", msg)
             print("GET:", op, pid_id, kd, ki, kd)
         return False
 
@@ -80,7 +80,7 @@ class App(Cmd):
             self.set_pid(pid_id, opt.KP, opt.KI, opt.KD)
         for pid_id in opt.PID_ID:
             msg = self.recv_msg()
-            op, pid_id = struc.unpack(">BB", msg)
+            op, pid_id = struct.unpack(">BB", msg)
             print("SET:", op, pid_id, kd, ki, kd)
         return False
 

@@ -8,7 +8,7 @@
 #include "lib/transmitter.h"
 #include "lib/motor.h"
 
-#define BASE_THROTTLE 1750
+#define BASE_THROTTLE fixedpt_rconst(1750)
 
 /** Data structures --------------------------------------------------------- */
 typedef struct pid_out_t {
@@ -31,16 +31,16 @@ void* thread_2_main(void* args)
 	while (!angles_is_init());
 
 	pthread_mutex_lock(&pid_mtx);
-	pid_create(&pitch_pid, fixedpt_rconst(0.4), fixedpt_rconst(0.0),
+	pid_create(&pitch_pid, fixedpt_rconst(0.8), fixedpt_rconst(0.0),
 			fixedpt_rconst(0.0));
-	pid_create(&roll_pid, fixedpt_rconst(0.4), fixedpt_rconst(0.0),
+	pid_create(&roll_pid, fixedpt_rconst(0.8), fixedpt_rconst(0.0),
 			fixedpt_rconst(0.0));
 
-	pid_create(&pitch_vel_pid, fixedpt_rconst(0.4), fixedpt_rconst(0.0),
+	pid_create(&pitch_vel_pid, fixedpt_rconst(0.8), fixedpt_rconst(0.0),
 			fixedpt_rconst(0.0));
-	pid_create(&roll_vel_pid, fixedpt_rconst(0.4), fixedpt_rconst(0.0),
+	pid_create(&roll_vel_pid, fixedpt_rconst(0.8), fixedpt_rconst(0.0),
 			fixedpt_rconst(0.0));
-	pid_create(&yaw_vel_pid, fixedpt_rconst(0.4), fixedpt_rconst(0.0),
+	pid_create(&yaw_vel_pid, fixedpt_rconst(0.8), fixedpt_rconst(0.0),
 			fixedpt_rconst(0.0));
 	pthread_mutex_unlock(&pid_mtx);
 
@@ -64,14 +64,14 @@ void* thread_2_main(void* args)
 			transmitter_read();
 			transmitter tm = get_transmitter_values();
 
-			//fixedpt throttle = fixedpt_fromint(tm.throttle);
-			fixedpt throttle = fixedpt_fromint(1700);
+			fixedpt throttle = fixedpt_fromint(tm.throttle);
+			//fixedpt throttle = fixedpt_fromint(1700);
 			if (throttle > fixedpt_rconst(1500)) {
 
-				motor_0 = throttle - pid_vel.pitch - pid_vel.roll;
-				motor_1 = throttle + pid_vel.pitch - pid_vel.roll;
-				motor_2 = throttle + pid_vel.pitch + pid_vel.roll;
-				motor_3 = throttle - pid_vel.pitch + pid_vel.roll;
+				motor_0 = throttle - pid_vel.pitch - pid_vel.roll - pid_vel.yaw;
+				motor_1 = throttle + pid_vel.pitch - pid_vel.roll + pid_vel.yaw;
+				motor_2 = throttle + pid_vel.pitch + pid_vel.roll - pid_vel.yaw;
+				motor_3 = throttle - pid_vel.pitch + pid_vel.roll + pid_vel.yaw;
 
 				if (motor_0 < BASE_THROTTLE)
 					motor_0 = BASE_THROTTLE;

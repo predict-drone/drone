@@ -27,9 +27,9 @@ static void rx_callback(uint8_t msg_len, uint8_t* msg) {
 			pid_values.opcode = COMM_OP_RSP_GET_PID_VALUES;
 			pid_values.pid_id = msg[1];
 			pthread_mutex_lock(&pid_mtx);
-			pid_values.kp = pid_ins->kp*100;
-			pid_values.ki = pid_ins->ki*100;
-			pid_values.kd = pid_ins->kd*100;
+			pid_values.kp = fixedpt_toint(pid_ins->kp)*100;
+			pid_values.ki = fixedpt_toint(pid_ins->ki)*100;
+			pid_values.kd = fixedpt_toint(pid_ins->kd)*100;
 			pthread_mutex_unlock(&pid_mtx);
 			comm_send_msg(sizeof(pid_values), (uint8_t*)&pid_values);
 			break;
@@ -71,15 +71,5 @@ void* thread_3_main(void* args)
 	uint64_t next_time = micros();
 	while (true) {
 		comm_process();
-		if (next_time < micros()) {
-			angles_t a = get_angles();
-			comm_data_t data;
-			data.opcode = COMM_OP_RSP_ANGLE_VALUES;
-			data.x = a.pitch*100;
-			data.y = a.roll*100;
-			data.z = a.yaw*100;
-			comm_send_msg(sizeof(data), (uint8_t*)&data);
-			next_time += 100000;
-		}
 	}
 }
