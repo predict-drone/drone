@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "main.h"
 #include "lib/angles.h"
@@ -31,24 +32,22 @@ void* thread_2_main(void* args)
 	while (!angles_is_init());
 
 	pthread_mutex_lock(&pid_mtx);
-	pid_create(&pitch_pid, fixedpt_rconst(0.4), fixedpt_rconst(0.0),
+	pid_create(&pitch_pid, fixedpt_rconst(0.8), fixedpt_rconst(0.0),
 			fixedpt_rconst(0.0));
-	pid_create(&roll_pid, fixedpt_rconst(0.4), fixedpt_rconst(0.0),
+	pid_create(&roll_pid, fixedpt_rconst(0.8), fixedpt_rconst(0.0),
 			fixedpt_rconst(0.0));
 
-	pid_create(&pitch_vel_pid, fixedpt_rconst(0.4), fixedpt_rconst(0.0),
+	pid_create(&pitch_vel_pid, fixedpt_rconst(0.8), fixedpt_rconst(0.0),
 			fixedpt_rconst(0.0));
-	pid_create(&roll_vel_pid, fixedpt_rconst(0.4), fixedpt_rconst(0.0),
+	pid_create(&roll_vel_pid, fixedpt_rconst(0.8), fixedpt_rconst(0.0),
 			fixedpt_rconst(0.0));
-	pid_create(&yaw_vel_pid, fixedpt_rconst(0.4), fixedpt_rconst(0.0),
+	pid_create(&yaw_vel_pid, fixedpt_rconst(0.8), fixedpt_rconst(0.0),
 			fixedpt_rconst(0.0));
 	pthread_mutex_unlock(&pid_mtx);
 
 	uint64_t next_time = micros();
 	while (true) {
 		if (next_time < micros()) {
-			uint64_t ti = micros();
-			fixedpt motor_0, motor_1, motor_2, motor_3;
 			angles_t angles = get_angles();
 
 			pthread_mutex_lock(&pid_mtx);
@@ -65,43 +64,41 @@ void* thread_2_main(void* args)
 			transmitter tm = get_transmitter_values();
 
 			//fixedpt throttle = fixedpt_fromint(tm.throttle);
-			fixedpt throttle = fixedpt_fromint(1700);
+			//pthread_mutex_lock(&print_mtx);
+			//printf("Throttle: %d %ld\n", tm.throttle, throttle>>16);
+			//pthread_mutex_unlock(&print_mtx);
+			fixedpt throttle = fixedpt_fromint(1800);
+
+			motor_t motor;
 			if (throttle > fixedpt_rconst(1500)) {
 
-				motor_0 = throttle - pid_vel.pitch - pid_vel.roll;
-				motor_1 = throttle + pid_vel.pitch - pid_vel.roll;
-				motor_2 = throttle + pid_vel.pitch + pid_vel.roll;
-				motor_3 = throttle - pid_vel.pitch + pid_vel.roll;
+				motor.m0 = fixedpt_toint(throttle - pid_vel.pitch - pid_vel.roll);
+				motor.m1 = fixedpt_toint(throttle + pid_vel.pitch - pid_vel.roll);
+				motor.m2 = fixedpt_toint(throttle + pid_vel.pitch + pid_vel.roll);
+				motor.m3 = fixedpt_toint(throttle - pid_vel.pitch + pid_vel.roll);
 
-				if (motor_0 < BASE_THROTTLE)
-					motor_0 = BASE_THROTTLE;
-				else if (motor_1 < BASE_THROTTLE)
-					motor_1 = BASE_THROTTLE;
-				else if (motor_2 < BASE_THROTTLE)
-					motor_2 = BASE_THROTTLE;
-				else if (motor_3 < BASE_THROTTLE)
-					motor_3 = BASE_THROTTLE;
+				if (motor.m0 < BASE_THROTTLE)
+					motor.m0 = BASE_THROTTLE;
+				else if (motor.m1 < BASE_THROTTLE)
+					motor.m1 = BASE_THROTTLE;
+				else if (motor.m2 < BASE_THROTTLE)
+					motor.m2 = BASE_THROTTLE;
+				else if (motor.m3 < BASE_THROTTLE)
+					motor.m3 = BASE_THROTTLE;
 			} else {
-				motor_0 = 0;
-				motor_1 = 0;
-				motor_2 = 0;
-				motor_3 = 0;
+				memset(&motor, 0, sizeof(motor));
 			}
 
-			motor_run(0, fixedpt_toint(motor_0));
-			motor_run(1, fixedpt_toint(motor_1));
-			motor_run(2, fixedpt_toint(motor_2));
-			motor_run(3, fixedpt_toint(motor_3));
-
-			uint64_t te = micros();
+			motor_run(motor);
 
 			pthread_mutex_lock(&print_mtx);
-			printf("Motor: %.2f %.2f %.1f, %.1f, %.1f, %.1f %lld\n", 
-					fixedpt_tofloat(angles.pitch_speed),
-					fixedpt_tofloat(angles.roll_speed),
-					fixedpt_tofloat(pid_pos.pitch), fixedpt_tofloat(pid_pos.roll),
-					fixedpt_tofloat(pid_vel.pitch), fixedpt_tofloat(pid_vel.roll),
-					te-ti);
+			//printf("Motor: %d %d %d, %d\n", motor.m0, motor.m1, motor.m2, motor.m3);
+			//printf("Motor: %.2f %.2f %.1f, %.1f, %.1f, %.1f %lld\n",
+			//		fixedpt_tofloat(angles.pitch_speed),
+			//		fixedpt_tofloat(angles.roll_speed),
+			//		fixedpt_tofloat(pid_pos.pitch), fixedpt_tofloat(pid_pos.roll),
+			//		fixedpt_tofloat(pid_vel.pitch), fixedpt_tofloat(pid_vel.roll),
+			//		te-ti);
 			pthread_mutex_unlock(&print_mtx);
 			next_time += 5000;
 		}
