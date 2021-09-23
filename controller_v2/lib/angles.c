@@ -171,9 +171,9 @@ void calculate_angles(void) {
 	angles.pitch = pitch;
 	angles.roll = roll;
 	angles.yaw += gyro.z;
-	angles.pitch_speed += gyro.y_s;
-	angles.roll_speed += gyro.x_s;
-	angles.yaw_speed += gyro.z_s;
+	angles.pitch_speed = gyro.y_s;
+	angles.roll_speed = gyro.x_s;
+	angles.yaw_speed = gyro.z_s;
 
 	if (angles.yaw > fixedpt_fromint(180)) angles.yaw -= fixedpt_fromint(360);
 	if (angles.yaw < fixedpt_fromint(-180)) angles.yaw += fixedpt_fromint(360);
