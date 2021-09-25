@@ -16,6 +16,8 @@ typedef struct pid_instance_t {
 
 void pid_create(pid_instance_t* pid, fixedpt kp, fixedpt ki, fixedpt kd);
 
+void pid_reset_integral(pid_instance_t* pid);
+
 fixedpt pid_fire(pid_instance_t pid, fixedpt input, fixedpt feedback);
 
 #endif // __PID_H

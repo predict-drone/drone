@@ -10,7 +10,7 @@
 #include "atan_table.h"
 
 #define SETUP_MEASUREMENTS 512U
-#define SETUP_MEASUREMENTS_FIX (fixedpt_rconst(5000))
+#define SETUP_MEASUREMENTS_FIX (fixedpt_fromint(SETUP_MEASUREMENTS))
 #define ALPHA (fixedpt_rconst(0.8))
 
 

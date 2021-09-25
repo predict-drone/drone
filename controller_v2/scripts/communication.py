@@ -34,9 +34,10 @@ class App(Cmd):
             msg_len = int.from_bytes(self.s.read(1), "little")
             msg = self.s.read(msg_len)
             if msg[0] == CommOpcode.ANGLES:
-                op, x, y, z = struct.unpack(">Biii", msg)
+                op, x, y, z, m0, m1, m2, m3 = struct.unpack(">BiiiIIII", msg)
                 with open("/tmp/drone_data.log", "a") as f:
-                    f.write(f"x: {x/100}, y:{y/100}, z: {z/100}\n")
+                    f.write(f"{round(x/(2**16), 2)}, {round(y/(2**16), 2)} {round(z/(2**16), 2)} "
+                        + f"{round(m0/(2**16), 2)}, {round(m1/(2**16), 2)}, {round(m2/(2**16), 2)}, {round(m3/(2**16), 2)}\n")
             else:
                 self.read_queue.put(msg)
 
@@ -50,11 +51,9 @@ class App(Cmd):
         msg = struct.pack(">BB", CommOpcode.GET_PID, pid_id)
         self.send_msg(msg)
 
-    def set_pid(self, pid_id: int, kp: float, ki: float, kd: float):
-        kp = int(kp*100)
-        ki = int(ki*100)
-        kd = int(kd*100)
+    def set_pid(self, pid_id: int, kp: int, ki: int, kd: int):
         msg = struct.pack(">BBIII", CommOpcode.SET_PID, pid_id, kp, ki, kd)
+        print(msg.hex())
         self.send_msg(msg)
 
     get_pid_parser = argparse.ArgumentParser()
@@ -65,8 +64,11 @@ class App(Cmd):
             self.get_pid(pid_id)
         for pid_id in opt.PID_ID:
             msg = self.recv_msg()
-            op, pid_id, kd, ki, kd = struct.unpack(">BBIII", msg)
-            print("GET:", op, pid_id, kd, ki, kd)
+            op, pid_id, kp, ki, kd = struct.unpack(">BBIII", msg)
+            kp /= 2**16
+            ki /= 2**16
+            kd /= 2**16
+            print("GET:", op, pid_id, round(kp, 2), round(ki, 2), round(kd, 2))
         return False
 
     set_pid_parser = argparse.ArgumentParser()
@@ -77,11 +79,14 @@ class App(Cmd):
     @with_argparser(set_pid_parser)
     def do_set_pid(self, opt):
         for pid_id in opt.PID_ID:
-            self.set_pid(pid_id, opt.KP, opt.KI, opt.KD)
+            kp = int(opt.KP[0]/100*(2**16))
+            ki = int(opt.KI[0]/100*(2**16))
+            kd = int(opt.KD[0]/100*(2**16))
+            self.set_pid(pid_id, kp, ki, kd)
         for pid_id in opt.PID_ID:
             msg = self.recv_msg()
             op, pid_id = struct.unpack(">BB", msg)
-            print("SET:", op, pid_id, kd, ki, kd)
+            print("SET:", op, pid_id, kp, ki, kd)
         return False
 
     def do_quit(self, opt):

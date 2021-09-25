@@ -6,20 +6,14 @@
 enum comm_op_t {
 	COMM_OP_GET_PID_VALUES = 0x01,
 	COMM_OP_SET_PID_VALUES,
-	COMM_OP_SET_BASE_THROTTLE,
-	COMM_OP_LOG_PID,
-	COMM_OP_LOG_POSITION,
-	COMM_OP_LOG_MOTOR,
+	COMM_OP_LOG_ANGLES,
+	
 };
 
 enum comm_op_rsp_t {
 	COMM_OP_RSP_GET_PID_VALUES = 0x81,
 	COMM_OP_RSP_SET_PID_VALUES,
 	COMM_OP_RSP_ANGLE_VALUES,
-	COMM_OP_RSP_SET_BASE_THROTTLE,
-	COMM_OP_RSP_LOG_PID,
-	COMM_OP_RSP_LOG_POSITION,
-	COMM_OP_RSP_LOG_MOTOR,
 };
 
 enum comm_pid_id_t {
@@ -44,6 +38,10 @@ typedef struct comm_data_t {
 	int32_t x;
 	int32_t y;
 	int32_t z;
+	uint32_t m0;
+	uint32_t m1;
+	uint32_t m2;
+	uint32_t m3;
 } __attribute__((packed)) comm_data_t;
 
 

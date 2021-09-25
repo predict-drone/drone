@@ -17,6 +17,8 @@ extern pid_instance_t yaw_pid;
 extern pid_instance_t pitch_vel_pid;
 extern pid_instance_t roll_vel_pid;
 extern pid_instance_t yaw_vel_pid;
+extern pthread_mutex_t motor_mtx;
+extern fixedpt motor_0, motor_1, motor_2, motor_3;
 
 
 /** Thread main functions --------------------------------------------------- */

@@ -27,9 +27,9 @@ static void rx_callback(uint8_t msg_len, uint8_t* msg) {
 			pid_values.opcode = COMM_OP_RSP_GET_PID_VALUES;
 			pid_values.pid_id = msg[1];
 			pthread_mutex_lock(&pid_mtx);
-			pid_values.kp = fixedpt_toint(pid_ins->kp)*100;
-			pid_values.ki = fixedpt_toint(pid_ins->ki)*100;
-			pid_values.kd = fixedpt_toint(pid_ins->kd)*100;
+			pid_values.kp = pid_ins->kp;
+			pid_values.ki = pid_ins->ki;
+			pid_values.kd = pid_ins->kd;
 			pthread_mutex_unlock(&pid_mtx);
 			comm_send_msg(sizeof(pid_values), (uint8_t*)&pid_values);
 			break;
@@ -46,9 +46,9 @@ static void rx_callback(uint8_t msg_len, uint8_t* msg) {
 
 			comm_pid_values_t* pid_values = (comm_pid_values_t*)msg;
 			pthread_mutex_lock(&pid_mtx);
-			pid_ins->kp = pid_values->kp / 100;
-			pid_ins->ki = pid_values->ki / 100;
-			pid_ins->kd = pid_values->kd / 100;
+			pid_ins->kp = pid_values->kp;
+			pid_ins->ki = pid_values->ki;
+			pid_ins->kd = pid_values->kd;
 			pthread_mutex_unlock(&pid_mtx);
 			uint8_t rsp[] = {COMM_OP_RSP_SET_PID_VALUES, msg[1]};
 			comm_send_msg(sizeof(rsp), rsp);
@@ -65,11 +65,31 @@ void* thread_3_main(void* args)
 	pthread_mutex_lock(&print_mtx);
 	printf("Thread 3\n");
 	pthread_mutex_unlock(&print_mtx);
+
+	while (!angles_is_init());
 	
 	comm_init(rx_callback);
 
 	uint64_t next_time = micros();
 	while (true) {
 		comm_process();
+		if (false) {
+			angles_t angles = get_angles();
+			comm_data_t data;
+			data.opcode = COMM_OP_LOG_ANGLES;
+			data.x = angles.pitch;
+			data.y = angles.roll;
+			data.z = angles.yaw;
+			pthread_mutex_lock(&motor_mtx);
+			data.m0 = motor_0;
+			data.m1 = motor_1;
+			data.m2 = motor_2;
+			data.m3 = motor_3;
+			pthread_mutex_unlock(&motor_mtx);
+
+			comm_send_msg(sizeof(data), (uint8_t*)&data);
+
+			next_time += 100000;
+		}
 	}
 }

@@ -8,7 +8,7 @@
 #include "lib/transmitter.h"
 #include "lib/motor.h"
 
-#define BASE_THROTTLE fixedpt_rconst(1750)
+#define BASE_THROTTLE fixedpt_rconst(1680)
 
 /** Data structures --------------------------------------------------------- */
 typedef struct pid_out_t {
@@ -31,16 +31,16 @@ void* thread_2_main(void* args)
 	while (!angles_is_init());
 
 	pthread_mutex_lock(&pid_mtx);
-	pid_create(&pitch_pid, fixedpt_rconst(0.8), fixedpt_rconst(0.0),
+	pid_create(&pitch_pid, fixedpt_rconst(0), fixedpt_rconst(0.0),
 			fixedpt_rconst(0.0));
-	pid_create(&roll_pid, fixedpt_rconst(0.8), fixedpt_rconst(0.0),
+	pid_create(&roll_pid, fixedpt_rconst(0), fixedpt_rconst(0.0),
 			fixedpt_rconst(0.0));
 
-	pid_create(&pitch_vel_pid, fixedpt_rconst(0.8), fixedpt_rconst(0.0),
+	pid_create(&pitch_vel_pid, fixedpt_rconst(0), fixedpt_rconst(0),
 			fixedpt_rconst(0.0));
-	pid_create(&roll_vel_pid, fixedpt_rconst(0.8), fixedpt_rconst(0.0),
+	pid_create(&roll_vel_pid, fixedpt_rconst(0), fixedpt_rconst(0.0),
 			fixedpt_rconst(0.0));
-	pid_create(&yaw_vel_pid, fixedpt_rconst(0.8), fixedpt_rconst(0.0),
+	pid_create(&yaw_vel_pid, fixedpt_rconst(0), fixedpt_rconst(0.0),
 			fixedpt_rconst(0.0));
 	pthread_mutex_unlock(&pid_mtx);
 
@@ -48,7 +48,6 @@ void* thread_2_main(void* args)
 	while (true) {
 		if (next_time < micros()) {
 			uint64_t ti = micros();
-			fixedpt motor_0, motor_1, motor_2, motor_3;
 			angles_t angles = get_angles();
 
 			pthread_mutex_lock(&pid_mtx);
@@ -63,9 +62,9 @@ void* thread_2_main(void* args)
 
 			transmitter_read();
 			transmitter tm = get_transmitter_values();
-
 			fixedpt throttle = fixedpt_fromint(tm.throttle);
-			//fixedpt throttle = fixedpt_fromint(1700);
+
+			pthread_mutex_lock(&motor_mtx);
 			if (throttle > fixedpt_rconst(1500)) {
 
 				motor_0 = throttle - pid_vel.pitch - pid_vel.roll - pid_vel.yaw;
@@ -82,11 +81,20 @@ void* thread_2_main(void* args)
 				else if (motor_3 < BASE_THROTTLE)
 					motor_3 = BASE_THROTTLE;
 			} else {
+				pthread_mutex_lock(&pid_mtx);
+				pid_reset_integral(&pitch_pid);
+				pid_reset_integral(&roll_pid);
+				pid_reset_integral(&pitch_vel_pid);
+				pid_reset_integral(&roll_vel_pid);
+				pid_reset_integral(&yaw_vel_pid);
+				pthread_mutex_unlock(&pid_mtx);
+
 				motor_0 = 0;
 				motor_1 = 0;
 				motor_2 = 0;
 				motor_3 = 0;
 			}
+			pthread_mutex_unlock(&motor_mtx);
 
 			motor_run(0, fixedpt_toint(motor_0));
 			motor_run(1, fixedpt_toint(motor_1));

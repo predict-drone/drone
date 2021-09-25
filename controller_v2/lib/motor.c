@@ -32,7 +32,13 @@ void motor_run(int motor_number, int throttle)
 	if (motor_number < 0) motor_number = 0;
 	throttle = throttle * 2 - 2000;
 	if (throttle < 700) throttle = 700;
-	//else if (throttle < 1000) throttle = 1000;
+	else {
+		if (motor_number == 2) {
+			throttle += 20;
+		} else if (motor_number == 3) {
+			throttle += 40;
+		}
+	}
 	
 	*(MOTOR + motor_number) = throttle;
 	

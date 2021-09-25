@@ -17,6 +17,11 @@ void pid_create(pid_instance_t* pid, fixedpt kp, fixedpt ki, fixedpt kd)
 	pid->last_time = micros();
 }
 
+void pid_reset_integral(pid_instance_t* pid)
+{
+	pid->ki_accum = 0;
+}
+
 fixedpt pid_fire(pid_instance_t pid, fixedpt input, fixedpt feedback)
 {
 	uint64_t current_time = micros();
